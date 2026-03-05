@@ -1,5 +1,6 @@
 ﻿@page "/codeReview"
 @using Microsoft.AspNetCore.Components.Forms
+@using System.Text.RegularExpressions
 @inject HttpClient Http
 
 <PageTitle>Code Review AI</PageTitle>
@@ -25,8 +26,8 @@
         @if (_selectedFile != null)
         {
             <div class="form-text text-success">
-                ✓ Arquivo selecionado: <strong>@_selectedFile.Name</strong>
-                (@FormatFileSize(_selectedFile.Size))
+                ✓ Arquivo selecionado: <strong>@_selectedFileName</strong>
+                (@FormatFileSize(_selectedFileSize))
             </div>
         }
     </div>
@@ -68,40 +69,150 @@
     </div>
 }
 
-@* Área de resposta da IA *@
-@if (!string.IsNullOrEmpty(_aiResponse))
+@* Abas com resposta da IA *@
+@if (!string.IsNullOrEmpty(_aiResponse) || !string.IsNullOrEmpty(_rawJson))
 {
     <div class="card shadow-sm mt-4">
-        <div class="card-header bg-success text-white">
+        <div class="card-header bg-success-dark text-white">
             <h5 class="mb-0">Resposta do Agente</h5>
         </div>
         <div class="card-body">
-            <pre class="bg-light p-3 rounded"><code>@_aiResponse</code></pre>
+            <!-- Abas para diferentes visualizações -->
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab" aria-controls="summary" aria-selected="true">
+                        Resumo Executivo
+                    </button>
+                </li>
+                @if (!string.IsNullOrEmpty(_understanding))
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="understanding-tab" data-bs-toggle="tab" data-bs-target="#understanding" type="button" role="tab" aria-controls="understanding" aria-selected="false">
+                            Compreensão
+                        </button>
+                    </li>
+                }
+                @if (!string.IsNullOrEmpty(_review))
+                {
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="review-tab" data-bs-toggle="tab" data-bs-target="#review" type="button" role="tab" aria-controls="review" aria-selected="false">
+                            Revisão Detalhada
+                        </button>
+                    </li>
+                }
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw" type="button" role="tab" aria-controls="raw" aria-selected="false">
+                        JSON Bruto
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Conteúdo das abas -->
+            <div class="tab-content">
+                <!-- Aba: Resumo Executivo -->
+                <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
+                    @if (!string.IsNullOrEmpty(_aiResponse))
+                    {
+                        <div class="markdown-content p-3">
+                            @((MarkupString)ConvertMarkdownToHtml(_aiResponse))
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted p-3">Nenhum resumo disponível.</p>
+                    }
+                </div>
+
+                <!-- Aba: Compreensão -->
+                @if (!string.IsNullOrEmpty(_understanding))
+                {
+                    <div class="tab-pane fade" id="understanding" role="tabpanel" aria-labelledby="understanding-tab">
+                        <div class="markdown-content p-3">
+                            @((MarkupString)ConvertMarkdownToHtml(_understanding))
+                        </div>
+                    </div>
+                }
+
+                <!-- Aba: Revisão -->
+                @if (!string.IsNullOrEmpty(_review))
+                {
+                    <div class="tab-pane fade" id="review" role="tabpanel" aria-labelledby="review-tab">
+                        <div class="markdown-content p-3">
+                            @((MarkupString)ConvertMarkdownToHtml(_review))
+                        </div>
+                    </div>
+                }
+
+                <!-- Aba: JSON Bruto -->
+                <div class="tab-pane fade" id="raw" role="tabpanel" aria-labelledby="raw-tab">
+                    <pre class="bg-body-secondary p-3 rounded text-wrap"><code>@_rawJson</code></pre>
+                </div>
+            </div>
         </div>
     </div>
 }
 
 @code {
     private IBrowserFile? _selectedFile;
+    private byte[]? _selectedFileBytes;
+    private string _selectedFileName = string.Empty;
+    private string _selectedFileContentType = "application/octet-stream";
+    private long _selectedFileSize;
     private readonly CodeReviewModel _model = new();
     private bool _isLoading;
     private string _statusMessage = string.Empty;
     private string _statusCssClass = "alert-info";
     private string _aiResponse = string.Empty;
+    private string _understanding = string.Empty;
+    private string _review = string.Empty;
+    private string _rawJson = string.Empty;
 
     private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
-    private const string ApiEndpoint = "http://localhost:5000/api/review"; // Backend Flask local
+    private const string ApiEndpoint = "http://127.0.0.1:2518/api/review";
+    private const string LegacyApiEndpoint = "http://127.0.0.1:2518/api/review";
 
-    private void OnFileSelected(InputFileChangeEventArgs e)
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
-        _selectedFile = e.File;
+        _selectedFile = null;
+        _selectedFileBytes = null;
+        _selectedFileName = string.Empty;
+        _selectedFileContentType = "application/octet-stream";
+        _selectedFileSize = 0;
         _statusMessage = string.Empty;
-        StateHasChanged();
+
+        try
+        {
+            var file = e.File;
+            if (file.Size > MaxFileSize)
+            {
+                SetStatus(
+                    $"Arquivo muito grande. Limite: {FormatFileSize(MaxFileSize)}.",
+                    isError: true
+                );
+                return;
+            }
+
+            await using var stream = file.OpenReadStream(MaxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            _selectedFile = file;
+            _selectedFileBytes = memoryStream.ToArray();
+            _selectedFileName = file.Name;
+            _selectedFileContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType;
+            _selectedFileSize = file.Size;
+        }
+        catch (Exception ex)
+        {
+            SetStatus(GetReadableUploadError(ex), isError: true);
+        }
     }
 
     private async Task HandleSubmit()
     {
-        if (_selectedFile == null)
+        if (_selectedFile == null || _selectedFileBytes == null)
         {
             SetStatus("Selecione um arquivo antes de enviar.", isError: true);
             return;
@@ -113,40 +224,32 @@
 
         try
         {
-            using var content = new MultipartFormDataContent();
-
-            await using var stream = _selectedFile.OpenReadStream(MaxFileSize);
-            var streamContent = new StreamContent(stream);
-
-            var contentType = string.IsNullOrEmpty(_selectedFile.ContentType)
-            ? "application/octet-stream"
-            : _selectedFile.ContentType;
-            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-
-            content.Add(streamContent, "file", _selectedFile.Name);
-            content.Add(new StringContent(_model.Task ?? string.Empty), "task");
-
-            var response = await Http.PostAsync(ApiEndpoint, content);
+            var response = await SendReviewRequestAsync(_selectedFileBytes, _selectedFileName, _selectedFileContentType);
             var jsonResponse = await response.Content.ReadAsStringAsync();
+
+            // Debug: mostrar resposta bruta
+            Console.WriteLine($"Status Code: {response.StatusCode}");
+            Console.WriteLine($"Response JSON: {jsonResponse}");
 
             if (response.IsSuccessStatusCode)
             {
-                var result = System.Text.Json.JsonSerializer.Deserialize<ReviewResponse>(jsonResponse, 
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                
-                _aiResponse = result?.AiResponse ?? "Resposta vazia do servidor";
+                var parsed = ParseSuccessResponse(jsonResponse);
+                _aiResponse = parsed.AiResponse;
+                _understanding = parsed.Understanding;
+                _review = parsed.Review;
+                _rawJson = FormatJson(jsonResponse);
                 SetStatus("✓ Análise concluída com sucesso!", isError: false, isSuccess: true);
             }
             else
             {
-                var errorResult = System.Text.Json.JsonSerializer.Deserialize<ErrorResponse>(jsonResponse,
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                SetStatus($"Erro: {errorResult?.Error ?? response.ReasonPhrase}", isError: true);
+                // Mostrar JSON de erro também
+                _rawJson = FormatJson(jsonResponse);
+                SetStatus($"Erro: {ParseErrorResponse(jsonResponse, response.ReasonPhrase)}", isError: true);
             }
         }
         catch (Exception ex)
         {
-            SetStatus($"Erro ao enviar: {ex.Message}", isError: true);
+            SetStatus($"Erro ao enviar: {GetReadableUploadError(ex)}", isError: true);
         }
         finally
         {
@@ -157,15 +260,74 @@
     private void ClearForm()
     {
         _selectedFile = null;
+        _selectedFileBytes = null;
+        _selectedFileName = string.Empty;
+        _selectedFileContentType = "application/octet-stream";
+        _selectedFileSize = 0;
         _model.Task = string.Empty;
         _statusMessage = string.Empty;
         _aiResponse = string.Empty;
+        _understanding = string.Empty;
+        _review = string.Empty;
+        _rawJson = string.Empty;
     }
 
     private void SetStatus(string message, bool isError, bool isSuccess = false)
     {
         _statusMessage = message;
         _statusCssClass = isError ? "alert-danger" : (isSuccess ? "alert-success" : "alert-info");
+    }
+
+    private static string GetReadableUploadError(Exception ex)
+    {
+        var message = ex.Message?.Trim() ?? "Erro desconhecido ao ler arquivo.";
+
+        if (message.Contains("The requested file could not be read", StringComparison.OrdinalIgnoreCase))
+        {
+            return "O navegador nao conseguiu ler o arquivo. Tente copiar o arquivo para uma pasta local (ex.: Desktop), fechar o editor que esta usando o arquivo e selecionar novamente.";
+        }
+
+        if (message.Contains("undefined", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Falha ao ler o arquivo no navegador. Selecione o arquivo novamente e tente outro local da maquina.";
+        }
+
+        return message;
+    }
+
+    private async Task<HttpResponseMessage> SendReviewRequestAsync(
+        byte[] fileBytes,
+        string fileName,
+        string contentType
+    )
+    {
+        using var primaryContent = BuildMultipartContent(fileBytes, fileName, contentType);
+        var primaryResponse = await Http.PostAsync(ApiEndpoint, primaryContent);
+
+        if (primaryResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
+            return primaryResponse;
+        }
+
+        primaryResponse.Dispose();
+        using var legacyContent = BuildMultipartContent(fileBytes, fileName, contentType);
+        return await Http.PostAsync(LegacyApiEndpoint, legacyContent);
+    }
+
+    private MultipartFormDataContent BuildMultipartContent(
+        byte[] fileBytes,
+        string fileName,
+        string contentType
+    )
+    {
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(fileBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+
+        content.Add(fileContent, "file", fileName);
+        content.Add(new StringContent(_model.Task ?? string.Empty), "task");
+
+        return content;
     }
 
     private static string FormatFileSize(long bytes)
@@ -189,10 +351,148 @@
         public string Task { get; set; } = string.Empty;
         public string CodePreview { get; set; } = string.Empty;
         public string AiResponse { get; set; } = string.Empty;
+        public string Understanding { get; set; } = string.Empty;
+        public string Review { get; set; } = string.Empty;
     }
 
     public class ErrorResponse
     {
         public string Error { get; set; } = string.Empty;
+    }
+
+    private (string AiResponse, string Understanding, string Review) ParseSuccessResponse(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var aiResponse = string.Empty;
+            var understanding = GetJsonString(root, "understanding");
+            var review = GetJsonString(root, "review");
+
+            if (root.TryGetProperty("ai_response", out var aiElement))
+            {
+                if (aiElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    aiResponse = aiElement.GetString() ?? string.Empty;
+                }
+                else if (aiElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    aiResponse = GetJsonString(aiElement, "summary");
+                    if (string.IsNullOrWhiteSpace(understanding))
+                    {
+                        understanding = GetJsonString(aiElement, "understanding");
+                    }
+                    if (string.IsNullOrWhiteSpace(review))
+                    {
+                        review = GetJsonString(aiElement, "review");
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(aiResponse))
+            {
+                aiResponse = "Resposta vazia do servidor";
+            }
+
+            return (aiResponse, understanding, review);
+        }
+        catch
+        {
+            return ("Resposta recebida, mas em formato inesperado.", string.Empty, string.Empty);
+        }
+    }
+
+    private static string ParseErrorResponse(string json, string? fallback)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var error = GetJsonString(root, "error");
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                return error;
+            }
+
+            if (root.TryGetProperty("errors", out var errorsElement))
+            {
+                return errorsElement.ToString();
+            }
+        }
+        catch
+        {
+        }
+
+        return fallback ?? "Falha na requisição.";
+    }
+
+    private static string GetJsonString(System.Text.Json.JsonElement element, string propertyName)
+    {
+        if (
+            element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == System.Text.Json.JsonValueKind.String
+        )
+        {
+            return property.GetString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    private string FormatJson(string json)
+    {
+        try
+        {
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            var options = new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            };
+            return System.Text.Json.JsonSerializer.Serialize(jsonDoc.RootElement, options);
+        }
+        catch
+        {
+            return json; // Se não conseguir fazer parse, retorna o original
+        }
+    }
+
+    private string ConvertMarkdownToHtml(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown))
+            return string.Empty;
+
+        var html = markdown;
+
+        // Headers
+        html = Regex.Replace(html, @"^### (.+)$", "<h3>$1</h3>", RegexOptions.Multiline);
+        html = Regex.Replace(html, @"^## (.+)$", "<h2>$1</h2>", RegexOptions.Multiline);
+        html = Regex.Replace(html, @"^# (.+)$", "<h1>$1</h1>", RegexOptions.Multiline);
+
+        // Bold
+        html = Regex.Replace(html, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+
+        // Italic
+        html = Regex.Replace(html, @"\*(.+?)\*", "<em>$1</em>");
+
+        // Code blocks
+        html = Regex.Replace(html, @"```(.+?)```", "<pre><code>$1</code></pre>", RegexOptions.Singleline);
+
+        // Inline code
+        html = Regex.Replace(html, @"`(.+?)`", "<code>$1</code>");
+
+        // Lists
+        html = Regex.Replace(html, @"^\* (.+)$", "<li>$1</li>", RegexOptions.Multiline);
+        html = Regex.Replace(html, @"^- (.+)$", "<li>$1</li>", RegexOptions.Multiline);
+
+        // Links
+        html = Regex.Replace(html, @"\[(.+?)\]\((.+?)\)", "<a href=\"$2\">$1</a>");
+
+        // Line breaks
+        html = html.Replace("\n", "<br/>");
+
+        return html;
     }
 }

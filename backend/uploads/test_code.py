@@ -1,10 +1,20 @@
 def calcular_media(notas):
+    if not notas:
+        raise ValueError("A lista de notas nao pode estar vazia.")
+
     soma = 0
-    for i in range(len(notas)):
-        soma = soma + notas[i]
+    for nota in notas:
+        soma += nota
+
     media = soma / len(notas)
     return media
 
-numeros = [10, 8, 7, 9]
-print(calcular_media(numeros))
-print(calcular_media([]))  # Bug: divisão por zero
+
+if __name__ == "__main__":
+    numeros = [10, 8, 7, 9]
+    print(calcular_media(numeros))
+
+    try:
+        print(calcular_media([]))
+    except ValueError as exc:
+        print(f"Erro: {exc}")

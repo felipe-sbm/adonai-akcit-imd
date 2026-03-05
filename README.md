@@ -1,76 +1,33 @@
-# 🤖 Akcit Code Review AI
+# Agente de IA - Curso do Akcit
+Sistema de revisão de código com inteligência artificial, desenvolvido como projeto do curso de parceria do **IMD/UFRN** e do **Akcit**.
 
-Sistema de revisão de código com inteligência artificial, desenvolvido como projeto acadêmico da parceria **IMD/UFRN** e **Akcit**.
+## Visão Geral
+Este projeto combina um frontend feito **Blazor WebAssembly** com um backend em **Python/FastAPI** para oferecer uma **Revisão de Código** com análise inteligente de código com sugestões de melhoria, apontamento de erros e identificação de vulnerabilidades.
 
-## 📋 Visão Geral
-
-Este projeto combina um **frontend Blazor WebAssembly** com um **backend Python/FastAPI** para oferecer:
-
-- 🔍 **Code Review**: Análise inteligente de código com sugestões de melhoria
-- ✍️ **Redator de Matérias**: Escrita automática de artigos com pesquisa web
-- ✅ **Checador de Fatos**: Verificação de afirmações com relatórios detalhados
-
-## 🏗️ Arquitetura
-
-```
-akcit-agent-code-review/
-│
-├── frontend/                    # Blazor WebAssembly (.NET 9)
-│   ├── Pages/                   # Páginas Razor
-│   │   ├── Home.razor          # Página inicial
-│   │   └── CodeReview.razor    # Interface de code review
-│   ├── Layout/                  # Layouts e navegação
-│   ├── wwwroot/                 # Assets estáticos
-│   └── Program.cs              # Entry point
-│
-├── backend/                     # Python FastAPI
-│   ├── main.py                 # API REST
-│   ├── agents/                 # Agentes de IA
-│   │   ├── code_review_agent.py
-│   │   ├── writer_agent.py
-│   │   └── fact_checker_agent.py
-│   ├── llm/                    # Integração LLMs
-│   ├── tools/                  # Ferramentas (busca web)
-│   └── config/                 # Configurações
-│
-└── README.md
-```
-
-## 🚀 Quick Start
-
+## Início Rápido
 ### Pré-requisitos
-
 - [.NET 9 SDK](https://dotnet.microsoft.com/download)
 - [Python 3.10+](https://python.org)
-- API Keys:
-  - [Groq](https://console.groq.com) (gratuito)
-  - [Tavily](https://tavily.com) (gratuito)
+- [Chave de API do Groq](https://console.groq.com) (gratuito)
 
 ### 1. Backend (Python)
-
 ```bash
 cd backend
 
 # Criar ambiente virtual
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou: venv\Scripts\activate  # Windows
+python3 -m venv venv
+source venv/bin/activate  # Linux ou MacOS
+# ou em Windows: venv\Scripts\activate
 
 # Instalar dependências
-pip install -r requirements.txt
-
-# Configurar variáveis
-cp .env.example .env
-# Edite .env com suas API keys
+python3 -m pip install -r requirements.txt
 
 # Rodar servidor
-python main.py
+python3 app.py
 ```
-
-O backend estará em: http://localhost:8000
+O backend estará em: http://localhost:8000 (não esqueça de configurar a variável da API do Groq)
 
 ### 2. Frontend (Blazor)
-
 ```bash
 cd frontend
 
@@ -83,8 +40,7 @@ dotnet watch
 
 O frontend estará em: http://localhost:5000 (ou porta indicada)
 
-## 📚 API Endpoints
-
+## Endpoints da API
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/health` | Health check |
@@ -95,38 +51,27 @@ O frontend estará em: http://localhost:5000 (ou porta indicada)
 
 Documentação interativa: http://localhost:8000/docs
 
-## 🔧 Configuração
-
+## Configuração
 ### Variáveis de Ambiente (Backend)
-
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
-| `LLM_PROVIDER` | Provider: `groq` ou `openai` | `groq` |
 | `GROQ_API_KEY` | API key do Groq | - |
-| `TAVILY_API_KEY` | API key do Tavily | - |
 | `PORT` | Porta do servidor | `8000` |
 | `DEBUG` | Modo debug | `false` |
 
-## 🛠️ Tecnologias
-
+## Tecnologias
 ### Frontend
-- Blazor WebAssembly (.NET 9)
-- Bootstrap 5
-- C#
+- Blazor WebAssembly (com C# em .NET 9)
+- Bootstrap 5 (já vem instalado com Blazor)
 
 ### Backend
 - FastAPI (Python)
-- LangChain
 - Groq (LLM gratuito)
-- Tavily (busca web)
 
-## 👥 Créditos
-
+## Lecionadores e Orientadores
 Projeto desenvolvido para o curso do **IMD/UFRN** em parceria com a **Akcit**.
 
 - **Orientação**: Julia Dollis e Prof. Alyson Matheus
-- **Repositório**: [github.com/felipe-sbm/akcit-agent-code-review](https://github.com/felipe-sbm/akcit-agent-code-review)
 
-## 📝 Licença
-
-Projeto acadêmico - uso educacional.
+---
+Projeto acadêmico - uso educacional de nível técnico.
