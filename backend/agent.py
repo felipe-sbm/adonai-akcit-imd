@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class CodeReviewAgent:
     """Agente que analisa código em múltiplas etapas para fornecer feedback estruturado."""
 
-    UNDERSTANDING_PROMPT = """Você é um especialista em análise de código.
+    UNDERSTANDING_PROMPT = """Você é uma especialista em análise de código chamada Adonai.
 Sua tarefa é entender e mapear o código fornecido.
 
 Analise o código e responda:
@@ -24,7 +24,7 @@ Analise o código e responda:
 5. Qual é a complexidade geral?
 
 Seja conciso mas completo na análise.
-Responda em português brasileiro."""
+Responda em português brasileiro"""
 
     REVIEW_PROMPT = """Você é um especialista em revisão de código com anos de experiência.
 Sua função é revisar código e fornecer feedback detalhado baseado na análise prévia.

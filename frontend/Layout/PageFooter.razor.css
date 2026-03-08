@@ -1,0 +1,14 @@
+footer {
+  flex: 1;
+  padding-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: center;
+}
+h6 {
+    font-weight: 700;
+}
+p {
+  margin: 0;
+}

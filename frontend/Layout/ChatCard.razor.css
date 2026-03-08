@@ -1,0 +1,95 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 2rem;
+  max-width: 65rem;
+  min-height: 25rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+.chat-history {
+  padding: 2rem;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  height: 100%;
+  width: 100%;
+}
+
+.message {
+  display: flex;
+}
+
+.ai-text,
+.human-text {
+  max-width: 35rem;
+  border-radius: 1rem;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 0 2px #7e7b7a;
+}
+
+.ai-text {
+  margin-right: auto;
+  background-color: #ffd166;
+  border: solid 1px #f0c560;
+  border-bottom-left-radius: 0.05rem;
+  text-align: left;
+}
+
+.human-text {
+  margin-left: auto;
+  background-color: #f6f1ee;
+  border: solid 1px #e0dbd8;
+  border-bottom-right-radius: 0.05rem;
+  text-align: right;
+}
+
+.avatar img {
+  height: 25px;
+  margin: auto 5px 1rem 0;
+}
+
+.input-area {
+  flex: 1;
+  display: flex;
+  position: relative;
+  padding: 1rem;
+  background-color: #f8f8f8;
+  border-top: 1px solid #eee;
+}
+
+.file-button {
+  background-color: white;
+  border: none;
+  position: absolute;
+  top: 1.9rem;
+  left: 1.5rem;
+  z-index: 2;
+  border-radius: 1rem;
+  padding: 0 3px;
+}
+
+.text-area {
+  width: 100%;
+  min-height: 3.5rem;
+  height: 3.5rem;
+  position: relative;
+  border: none;
+  padding: 1rem 3.5rem 1rem 2.5rem;
+  background-color: white;
+  border-radius: 1rem;
+}
+
+.send-button {
+  background-color: #ee8100;
+  color: white;
+  border: 0;
+  box-shadow: 0 0 3px #0000008a;
+  position: absolute;
+  top: 1.8rem;
+  right: 1.5rem;
+  z-index: 2;
+  border-radius: 1rem;
+  padding: 3px 6px;
+}
