@@ -10,7 +10,7 @@
 }
 
 .chat-history {
-  padding: 2rem;
+  padding: 2rem 1rem;
   overflow-y: auto;
   scroll-behavior: smooth;
   height: 100%;
@@ -23,27 +23,69 @@
 
 .ai-text,
 .human-text {
-  max-width: 35rem;
-  border-radius: 1rem;
-  padding: 0.5rem 1rem;
-  box-shadow: 0 0 2px #7e7b7a;
+  border-radius: 1.15rem;
+  line-height: 1.25;
+  max-width: 75%;
+  padding: 0.5rem 0.875rem;
+  position: relative;
+  word-wrap: break-word;
+}
+
+.ai-text::before,
+.human-text::before,
+.ai-text::after,
+.human-text::after {
+  bottom: -0.1rem;
+  content: "";
+  height: 1rem;
+  position: absolute;
+}
+
+p.human-text {
+  margin-left: auto;
+  align-self: flex-end;
+  background-color: #eae8e5;
+  color: black;
+}
+
+.human-text::before {
+  border-bottom-left-radius: 0.8rem 0.7rem;
+  border-right: 1rem solid #eae8e5;
+  right: -0.35rem;
+  transform: translate(0, -0.1rem);
+}
+
+.human-text::after {
+  background-color: #ffffff;
+  border-bottom-left-radius: 0.5rem;
+  right: -40px;
+  transform: translate(-30px, -2px);
+  width: 10px;
 }
 
 .ai-text {
   margin-right: auto;
-  background-color: #ffd166;
-  border: solid 1px #f0c560;
-  border-bottom-left-radius: 0.05rem;
-  text-align: left;
+  align-items: flex-start;
+  background-color: #ee8100;
+  color: white;
 }
 
-.human-text {
-  margin-left: auto;
-  background-color: #f6f1ee;
-  border: solid 1px #e0dbd8;
-  border-bottom-right-radius: 0.05rem;
-  text-align: right;
+.ai-text:before {
+  border-bottom-right-radius: 0.8rem 0.7rem;
+  border-left: 1rem solid #ee8100;
+  left: -0.35rem;
+  transform: translate(0, -0.1rem);
 }
+
+.ai-text::after {
+  background-color: #ffffff;
+  border-bottom-right-radius: 0.5rem;
+  left: 20px;
+  transform: translate(-30px, -2px);
+  width: 10px;
+}
+
+/** Busquei uma referênia para o chat e tomei como inspiração: https://codepen.io/AllThingsSmitty/pen/jommGQ */
 
 .avatar img {
   height: 25px;
@@ -68,15 +110,17 @@
   z-index: 2;
   border-radius: 1rem;
   padding: 0 3px;
+  cursor: pointer;
 }
 
 .text-area {
   width: 100%;
   min-height: 3.5rem;
+  max-height: 8rem;
   height: 3.5rem;
   position: relative;
   border: none;
-  padding: 1rem 3.5rem 1rem 2.5rem;
+  padding: 1rem 3rem 1rem 2.5rem;
   background-color: white;
   border-radius: 1rem;
 }
@@ -88,7 +132,7 @@
   box-shadow: 0 0 3px #0000008a;
   position: absolute;
   top: 1.8rem;
-  right: 1.5rem;
+  right: 2.5rem;
   z-index: 2;
   border-radius: 1rem;
   padding: 3px 6px;
