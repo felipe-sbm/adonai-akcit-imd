@@ -8,13 +8,34 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from agent import CodeReviewAgent
+from bot.base_persona_prompt import BASE_PERSONA_PROMPT
+from bot.response_language_prompt import RESPONSE_LANGUAGE_PROMPT
+from bot.response_emotion import RESPONSE_EMOTION_PROMPT
+from bot.understanding_prompt import UNDERSTANDING_TASK_PROMPT
+from bot.review_prompt import REVIEW_TASK_PROMPT
 
 app = Flask(__name__)
 CORS(app)
 
+UNDERSTANDING_PROMPT = "\n\n".join([
+    BASE_PERSONA_PROMPT,
+    UNDERSTANDING_TASK_PROMPT,
+    RESPONSE_LANGUAGE_PROMPT,
+])
+
+REVIEW_PROMPT = "\n\n".join([
+    BASE_PERSONA_PROMPT,
+    REVIEW_TASK_PROMPT,
+    RESPONSE_EMOTION_PROMPT,
+    RESPONSE_LANGUAGE_PROMPT,
+])
+
 # Inicializar agente
 try:
-    ai_agent = CodeReviewAgent()
+    ai_agent = CodeReviewAgent(
+        understanding_prompt=UNDERSTANDING_PROMPT,
+        review_prompt=REVIEW_PROMPT,
+    )
     print("Agente de IA inicializado")
 except Exception as e:
     ai_agent = None

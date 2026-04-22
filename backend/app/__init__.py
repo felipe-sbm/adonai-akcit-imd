@@ -10,6 +10,11 @@ from app.config.settings import get_config
 from app.routes import api
 from app.routes.health import health_bp
 from app.routes.review import review_bp
+from bot.base_persona_prompt import BASE_PERSONA_PROMPT
+from bot.response_language_prompt import RESPONSE_LANGUAGE_PROMPT
+from bot.response_emotion import RESPONSE_EMOTION_PROMPT
+from bot.understanding_prompt import UNDERSTANDING_TASK_PROMPT
+from bot.review_prompt import REVIEW_TASK_PROMPT
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -31,11 +36,27 @@ def create_app():
     
     # Ativar CORS para todas as origens e rotas
     CORS(app, resources={r"/*": {"origins": "*"}})
+
+    understanding_prompt = "\n\n".join([
+        BASE_PERSONA_PROMPT,
+        UNDERSTANDING_TASK_PROMPT,
+        RESPONSE_LANGUAGE_PROMPT,
+    ])
+
+    review_prompt = "\n\n".join([
+        BASE_PERSONA_PROMPT,
+        REVIEW_TASK_PROMPT,
+        RESPONSE_EMOTION_PROMPT,
+        RESPONSE_LANGUAGE_PROMPT,
+    ])
     
     # Inicializar agente de IA
     try:
         from agent import CodeReviewAgent
-        app.config["AI_AGENT"] = CodeReviewAgent()
+        app.config["AI_AGENT"] = CodeReviewAgent(
+            understanding_prompt=understanding_prompt,
+            review_prompt=review_prompt,
+        )
         print("✓ Agente de IA inicializado com sucesso")
     except Exception as e:
         app.config["AI_AGENT"] = None

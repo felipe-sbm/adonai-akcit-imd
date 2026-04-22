@@ -34,7 +34,7 @@ source venv/bin/activate  # Linux ou MacOS
 python3 -m pip install -r requirements.txt
 
 # Rodar servidor
-python3 app.py
+python3 run.py
 ```
 
 O backend estará em: http://localhost:8000 (não esqueça de configurar a variável da API do Groq)

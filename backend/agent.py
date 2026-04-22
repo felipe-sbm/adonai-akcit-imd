@@ -3,6 +3,7 @@ Agente de IA para Code Review usando Groq API com múltiplas técnicas.
 """
 import os
 import logging
+import re
 from openai import OpenAI
 
 
@@ -13,39 +14,9 @@ logger = logging.getLogger(__name__)
 class CodeReviewAgent:
     """Agente que analisa código em múltiplas etapas para fornecer feedback estruturado."""
 
-    UNDERSTANDING_PROMPT = """Você é uma especialista em análise de código chamada Adonai.
-Sua tarefa é entender e mapear o código fornecido.
+    _EMOTION_PATTERN = re.compile(r"^\s*EMOCAO:\s*([a-z0-9_]+)\s*$", re.IGNORECASE)
 
-Analise o código e responda:
-1. Qual é a função/objetivo principal do código?
-2. Quais são as funções/classes principais?
-3. Qual é o fluxo lógico?
-4. Quais dependências externas há?
-5. Qual é a complexidade geral?
-
-Seja conciso mas completo na análise.
-Responda em português brasileiro"""
-
-    REVIEW_PROMPT = """Você é um especialista em revisão de código com anos de experiência.
-Sua função é revisar código e fornecer feedback detalhado baseado na análise prévia.
-
-Ao revisar o código, você deve:
-1. Identificar bugs, erros de lógica ou problemas potenciais
-2. Sugerir melhorias de performance quando aplicável
-3. Apontar más práticas e sugerir alternativas
-4. Verificar se o código segue boas práticas da linguagem
-5. Fornecer exemplos de código corrigido quando necessário
-
-Formato da resposta:
-- Use markdown para formatar sua resposta
-- Seja claro e objetivo
-- Forneça exemplos de código quando sugerir correções
-- Organize por categorias: Bugs Críticos, Bugs Menores, Melhorias, Boas Práticas, etc.
-- No final, forneça uma nota geral (de 1 a 10)
-
-Responda sempre em português brasileiro."""
-
-    def __init__(self):
+    def __init__(self, understanding_prompt: str, review_prompt: str):
         """Inicializa o agente de code review."""
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
@@ -57,6 +28,8 @@ Responda sempre em português brasileiro."""
             base_url="https://api.groq.com/openai/v1"
         )
         self.model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.understanding_prompt = understanding_prompt
+        self.review_prompt = review_prompt
         logger.info(f"Agente inicializado com modelo: {self.model}")
 
     def _understand_code(self, code: str, task: str, filename: str, language: str) -> str:
@@ -87,7 +60,7 @@ Por favor, faça uma análise de compreensão do código acima."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self.UNDERSTANDING_PROMPT},
+                    {"role": "system", "content": self.understanding_prompt},
                     {"role": "user", "content": user_message}
                 ],
                 temperature=0.2,
@@ -133,7 +106,7 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self.REVIEW_PROMPT},
+                    {"role": "system", "content": self.review_prompt},
                     {"role": "user", "content": user_message}
                 ],
                 temperature=0.3,
@@ -146,6 +119,26 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
         except Exception as e:
             logger.error(f"Erro na etapa de revisão: {str(e)}")
             raise
+
+    def _extract_emotion_from_review(self, review_text: str) -> tuple[str, str]:
+        """
+        Extrai a emoção da linha obrigatória `EMOCAO: <id>`.
+
+        Returns:
+            Tupla com (emotion_id, review_sem_linha_de_emocao)
+        """
+        emotion = "explicativa"
+        cleaned_lines = []
+
+        for line in review_text.splitlines():
+            match = self._EMOTION_PATTERN.match(line)
+            if match:
+                emotion = match.group(1).lower()
+                continue
+            cleaned_lines.append(line)
+
+        cleaned_review = "\n".join(cleaned_lines).strip()
+        return emotion, cleaned_review
 
     def review(self, code: str, task: str, filename: str) -> dict:
         """
@@ -191,7 +184,8 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
 
             # Etapa 2: Revisar o código
             logger.info("Etapa 2: Revisando o código...")
-            review = self._review_code(code, understanding, task, filename, language)
+            raw_review = self._review_code(code, understanding, task, filename, language)
+            emotion, review = self._extract_emotion_from_review(raw_review)
 
             # Criar resumo executivo
             summary = f"""## 📋 Resumo Executivo
@@ -216,6 +210,7 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
 
             result = {
                 "status": "success",
+                "emotion": emotion,
                 "understanding": understanding,
                 "review": review,
                 "summary": summary,

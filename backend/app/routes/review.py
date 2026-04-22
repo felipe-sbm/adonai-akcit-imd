@@ -86,6 +86,7 @@ def review_code():
             )
             return jsonify({
                 **review_response.to_dict(),
+                "emotion": analysis_result.get("emotion", "explicativa"),
                 "understanding": analysis_result["understanding"],
                 "review": analysis_result["review"],
             }), 200
