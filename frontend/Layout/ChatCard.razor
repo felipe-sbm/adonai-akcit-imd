@@ -1,22 +1,38 @@
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components
 @using System.Text.RegularExpressions
-@inject HttpClient Http
+@using adonai.Services
+@using Markdig
+@inject CodeReviewService ReviewService
 
 <div class="card">
     <div class="chat-history">
-        @* Mensagem da Adonai *@
-        <div class="message">
-            <div class="avatar d-flex align-content-end flex-wrap ">
-                <img src="images/assets/side-eye.webp" alt="Adonai fazendo Joinha">
+        @foreach (var item in _messages)
+        {
+            <div class="message">
+                @if (item.IsAi)
+                {
+                    <div class="avatar d-flex align-content-end flex-wrap">
+                        <img src="@GetAvatarPath(item.Emotion)" alt="Avatar da Adonai">
+                    </div>
+                    <div class="ai-text markdown-content">@((MarkupString)RenderMarkdown(StripEmotionMarker(item.Text)))</div>
+                }
+                else
+                {
+                    <p class="human-text">@item.Text</p>
+                }
             </div>
-            <p class="ai-text">Faaala rapaz, qual código você quer que eu analise?</p>
-        </div>
-        
-        @* Mensagem do usuário *@
-        <div class="message">
-            <p class="human-text">
-                Mana, queria que você olhasse esse problema de compilação que tô tendo aqui no javascript.</p>
+        }
+
+        @if (_isSending)
+        {
+            <div class="message">
+                <div class="avatar d-flex align-content-end flex-wrap">
+                    <img src="images/assets/think.webp" alt="Avatar da Adonai">
+                </div>
+                <p class="ai-text">Estou pensando...</p>
             </div>
+        }
         </div>
 
 
@@ -42,13 +58,12 @@
 
             <!-- input real escondido; o id liga ao for do label -->
             <InputFile id="fileInput" hidden OnChange="OnInputFileChange"
-                    accept=".cs,.js,.py,.java,.cpp,.razor,.html,.css,.json,.xml" />
+                    accept=".cs,.js,.ts,.py,.java,.jl,.cpp,.c,.razor,.html,.css,.scss,.sass,.json,.xml,.txt,.md,.mdx" />
 
             <textarea
                 class="text-area"
-                name=""
-                id=""
                 placeholder="Escreva o que você quer ver sobre o seu código..."
+                @bind="_message"
             >
             </textarea>
             <button
@@ -56,6 +71,7 @@
                 title="Enviar"
                 data-toggle="tooltip"
                 data-placement="top"
+                @onclick="SendAsync"
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -75,32 +91,118 @@
 
 
 @code {
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    private sealed record ChatMessage(bool IsAi, string Text, string? Emotion = null);
+
     private IBrowserFile? _selectedFile;
     private string _message = string.Empty;
+    private bool _isSending;
+    private readonly List<ChatMessage> _messages =
+    [
+        new(true, "Olá, qual código você quer analisar hoje?", "cumprimentando")
+    ];
+
+    private static string GetAvatarPath(string? emotion)
+    {
+        return emotion?.ToLowerInvariant() switch
+        {
+            "raiva" => "images/assets/angry.webp",
+            "star_struck" => "images/assets/awesome.webp",
+            "vergonha" => "images/assets/awkward.webp",
+            "piscada" => "images/assets/blink.webp",
+            "emburrada" => "images/assets/bruh.webp",
+            "medo" => "images/assets/scared.webp",
+            "parabens" => "images/assets/congratulations.webp",
+            "choro" => "images/assets/cry.webp",
+            "muito_choro" => "images/assets/crying-alot.webp",
+            "rejeitando" => "images/assets/decline.webp",
+            "depressiva" => "images/assets/depressed.webp",
+            "explicativa" => "images/assets/explain.webp",
+            "face_palm" => "images/assets/face-palm.webp",
+            "hangloose" => "images/assets/hangloose.webp",
+            "feliz" => "images/assets/happy.webp",
+            "cabeca_explodindo" => "images/assets/head-explosion.webp",
+            "coracao" => "images/assets/heart.webp",
+            "cumprimentando" => "images/assets/hello-world.webp",
+            "ideia" => "images/assets/idea.webp",
+            "agradecimento" => "images/assets/thanks.webp",
+            "rindo" => "images/assets/laugh.webp",
+            "joinha" => "images/assets/like.webp",
+            "tapando_boca" => "images/assets/shrug.webp",
+            "nervosa" => "images/assets/stop-it.webp",
+            "shrug" => "images/assets/shrug.webp",
+            "canto_de_olho" => "images/assets/side-eye.webp",
+            "rejeitando_para" => "images/assets/no-commentary.webp",
+            "muito_agradecida" => "images/assets/joyful.webp",
+            "pensando" => "images/assets/think.webp",
+            "deslike" => "images/assets/unlike.webp",
+            "muita_raiva" => "images/assets/very-angry.webp",
+            _ => "images/assets/side-eye.webp",
+        };
+    }
 
     private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
         _selectedFile = e.File;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string RenderMarkdown(string text)
+    {
+        return Markdown.ToHtml(text, MarkdownPipeline);
+    }
+
+    private static string StripEmotionMarker(string text)
+    {
+        var lines = text
+            .Split('\n')
+            .Where(line => !line.TrimStart().StartsWith("EMOCAO:", StringComparison.OrdinalIgnoreCase));
+
+        return string.Join("\n", lines).Trim();
     }
 
     private async Task SendAsync()
     {
-        if (_selectedFile == null) {
+        if (_isSending)
+        {
             return;
         }
 
-        using var content = new MultipartFormDataContent();
-        var stream = _selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 50);
-        var streamContent = new StreamContent(stream);
-        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
-            _selectedFile.ContentType ?? "application/octet-stream");
 
-        content.Add(streamContent, "file", _selectedFile.Name);
-        content.Add(new StringContent(_message ?? ""), "meuCampoTexto");
+        if (string.IsNullOrWhiteSpace(_message))
+        {
+            _messages.Add(new ChatMessage(true, "Me conta a tarefa que você quer que eu avalie no código."));
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
 
-        var response = await Http.PostAsync("https://localhost:2518", content);
-        response.EnsureSuccessStatusCode();
+        var prompt = _message.Trim();
+        _messages.Add(new ChatMessage(false, prompt));
+        _isSending = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var result = await ReviewService.SubmitCodeReviewAsync(_selectedFile, prompt);
+            _messages.Add(new ChatMessage(true, result.Message, result.Emotion));
+            
+            // Limpar campos após sucesso
+            _selectedFile = null;
+            _message = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessage(true, $"Erro ao enviar revisão: {ex.Message}", "depressiva"));
+        }
+        finally
+        {
+            _isSending = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     // Source - https://stackoverflow.com/questions/62022890/blazor-file-upload-iformfile

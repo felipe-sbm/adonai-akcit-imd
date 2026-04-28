@@ -43,6 +43,9 @@ Formato obrigatório:
 - Use exatamente um identificador da lista permitida abaixo
 - Depois da primeira linha, continue a resposta normal em markdown
 - Não explique o identificador, apenas use-o
+- Se o usuário só estiver cumprimentando, respondendo de forma vaga ou sem enviar código, mantenha a resposta curta, amigável e faça uma pergunta objetiva sobre o que ele quer fazer
+- Evite títulos grandes em markdown; prefira texto em negrito com uma linha em branco entre blocos
+- Se precisar destacar uma seção, use negrito em vez de #, ## ou ###
 
 Lista permitida de identificadores:
 {", ".join(EMOTION_OPTIONS)}

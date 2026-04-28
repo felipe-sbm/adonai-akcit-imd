@@ -59,9 +59,6 @@ O frontend estará em: http://localhost:5000 (ou porta indicada)
 | ------ | ------------------------- | ------------------------ |
 | GET    | `/health`                 | Health check             |
 | POST   | `/api/code-review`        | Revisão de código (JSON) |
-| POST   | `/api/code-review/upload` | Revisão via upload       |
-| POST   | `/api/writer`             | Escrita de matérias      |
-| POST   | `/api/fact-check`         | Checagem de fatos        |
 
 Documentação interativa: http://localhost:8000/docs
 

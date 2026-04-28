@@ -23,63 +23,63 @@ def review_code():
     Retorna análise da IA sobre o código.
     """
     try:
-        # Validar arquivo
-        if "file" not in request.files:
-            return jsonify({"error": "Nenhum arquivo enviado"}), 400
-
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "Nome do arquivo vazio"}), 400
-
-        if not allowed_file(file.filename, current_app.config["ALLOWED_EXTENSIONS"]):
-            return jsonify({"error": "Tipo de arquivo não permitido"}), 400
-
-        # Obter tarefa/mensagem
-        task = request.form.get("task", "").strip()
+        payload = request.get_json(silent=True) or {}
+        task = (request.form.get("task") or payload.get("task", "")).strip()
         if not task:
             return jsonify({"error": "Descreva a tarefa que deseja realizar"}), 400
 
-        # Salvar arquivo temporariamente
-        filepath = save_upload_file(file, current_app.config["UPLOAD_FOLDER"])
-
-        # Ler conteúdo do arquivo
-        code_content = read_file_content(filepath)
-
-        # Criar requisição validada
-        review_request = CodeReviewRequest(
-            filename=file.filename,
-            task=task,
-            code_content=code_content,
-        )
-
-        # Validar requisição
-        errors = review_request.validate()
-        if errors:
-            return jsonify({"errors": errors}), 400
-
-        # Chamar agente de IA para análise
         ai_agent = current_app.config.get("AI_AGENT")
-        if ai_agent:
-            analysis_result = ai_agent.review(
-                code_content, 
-                task, 
-                file.filename
-            )
-        else:
-            analysis_result = {
-                "status": "error",
-                "error": "Agente de IA não configurado. Verifique a chave GROQ_API_KEY."
-            }
+        file = request.files.get("file")
 
-        # Preparar resposta
-        code_preview = code_content[:500] + (
-            "..." if len(code_content) > 500 else ""
+        if file and file.filename:
+            if not allowed_file(file.filename, current_app.config["ALLOWED_EXTENSIONS"]):
+                return jsonify({"error": "Tipo de arquivo não permitido"}), 400
+
+            filepath = save_upload_file(file, current_app.config["UPLOAD_FOLDER"])
+            code_content = read_file_content(filepath)
+
+            review_request = CodeReviewRequest(
+                filename=file.filename,
+                task=task,
+                code_content=code_content,
+            )
+
+            errors = review_request.validate()
+            if errors:
+                return jsonify({"errors": errors}), 400
+
+            if ai_agent:
+                analysis_result = ai_agent.review(
+                    code_content,
+                    task,
+                    file.filename,
+                )
+            else:
+                analysis_result = {
+                    "status": "error",
+                    "error": "Agente de IA não configurado. Verifique a chave GROQ_API_KEY.",
+                }
+        else:
+            if ai_agent:
+                analysis_result = ai_agent.review_without_file(task)
+            else:
+                analysis_result = {
+                    "status": "error",
+                    "error": "Agente de IA não configurado. Verifique a chave GROQ_API_KEY.",
+                }
+
+        has_file = bool(file and file.filename)
+        filename = file.filename if has_file else "sem_arquivo"
+        code_preview = (
+            code_content[:500] + ("..." if len(code_content) > 500 else "")
+            if has_file
+            else "Nenhum arquivo anexado."
         )
 
         if analysis_result["status"] == "success":
             review_response = CodeReviewResponse(
                 status="success",
-                filename=file.filename,
+                filename=filename,
                 task=task,
                 code_preview=code_preview,
                 ai_response=analysis_result["summary"],

@@ -15,6 +15,7 @@ class CodeReviewAgent:
     """Agente que analisa código em múltiplas etapas para fornecer feedback estruturado."""
 
     _EMOTION_PATTERN = re.compile(r"^\s*EMOCAO:\s*([a-z0-9_]+)\s*$", re.IGNORECASE)
+    _GREETING_PATTERN = re.compile(r"^\s*(oi|ol[aá]|ola|eai|e aí|hello|hi|boa noite|bom dia|boa tarde)\s*[!.,\s]*$", re.IGNORECASE)
 
     def __init__(self, understanding_prompt: str, review_prompt: str):
         """Inicializa o agente de code review."""
@@ -120,6 +121,38 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
             logger.error(f"Erro na etapa de revisão: {str(e)}")
             raise
 
+    def _review_task_only(self, task: str) -> str:
+        """
+        Etapa alternativa quando não há arquivo anexado.
+
+        Returns:
+            Orientação geral em formato de revisão textual.
+        """
+        user_message = f"""**Tarefa do usuário:** {task}
+
+Não há arquivo anexado.
+
+Responda em Markdown curto, com no máximo 3 blocos curtos.
+Não use títulos grandes.
+Se não houver contexto suficiente, faça uma pergunta objetiva e ofereça ajuda.
+Se for apenas um cumprimento, responda de forma amigável e breve."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.review_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                temperature=0.3,
+                max_tokens=2048,
+            )
+            return response.choices[0].message.content
+
+        except Exception as e:
+            logger.error(f"Erro na etapa de revisão sem arquivo: {str(e)}")
+            raise
+
     def _extract_emotion_from_review(self, review_text: str) -> tuple[str, str]:
         """
         Extrai a emoção da linha obrigatória `EMOCAO: <id>`.
@@ -175,6 +208,40 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
         }
         language = language_map.get(extension, extension.upper())
 
+        if not code.strip():
+            try:
+                logger.info("Nenhum arquivo anexado; usando revisão baseada apenas na tarefa.")
+                raw_review = self._review_task_only(task)
+                emotion, review = self._extract_emotion_from_review(raw_review)
+                summary = f"""## Resumo
+
+**Arquivo:** nenhum anexado
+**Tarefa:** {task}
+
+---
+
+### Orientação
+{review}
+
+---
+
+**Análise concluída com sucesso!**"""
+
+                return {
+                    "status": "success",
+                    "emotion": emotion,
+                    "understanding": "Nenhum arquivo foi enviado. A resposta abaixo traz orientação geral baseada na tarefa informada.",
+                    "review": review,
+                    "summary": summary,
+                }
+
+            except Exception as e:
+                logger.error(f"Erro durante análise sem arquivo: {str(e)}")
+                return {
+                    "status": "error",
+                    "error": f"Erro: {str(e)}",
+                }
+
         try:
             logger.info(f"Iniciando análise do arquivo: {filename}")
 
@@ -187,8 +254,8 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
             raw_review = self._review_code(code, understanding, task, filename, language)
             emotion, review = self._extract_emotion_from_review(raw_review)
 
-            # Criar resumo executivo
-            summary = f"""## 📋 Resumo Executivo
+            # Criar resumo
+            summary = f"""## Resumo
 
 **Arquivo:** {filename}
 **Linguagem:** {language}
@@ -196,12 +263,12 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
 
 ---
 
-### ✅ Etapa 1: Compreensão do Código
+### Etapa 1: Compreensão do Código
 {understanding}
 
 ---
 
-### 🔍 Etapa 2: Revisão Detalhada
+### Etapa 2: Revisão Detalhada
 {review}
 
 ---
@@ -223,5 +290,26 @@ Baseado na análise acima, forneça uma revisão detalhada do código."""
             logger.error(f"Erro durante análise do código: {str(e)}")
             return {
                 "status": "error",
-                "error": f"❌ Erro ao processar com IA: {str(e)}",
+                "error": f"Erro ao processar com IA: {str(e)}",
             }
+
+    def review_without_file(self, task: str) -> dict:
+        """
+        Analisa apenas a tarefa do usuário quando nenhum arquivo foi anexado.
+
+        Args:
+            task: Descrição da tarefa/problema do usuário
+
+        Returns:
+            Dicionário com uma revisão geral baseada apenas na tarefa.
+        """
+        if self._GREETING_PATTERN.match(task.strip()):
+            return {
+                "status": "success",
+                "emotion": "cumprimentando",
+                "understanding": "O usuário enviou apenas um cumprimento.",
+                "review": "Oi! Como posso ajudar? Se quiser, me mande um arquivo ou descreva o que você quer analisar.",
+                "summary": "Oi! Como posso ajudar? Se quiser, me mande um arquivo ou descreva o que você quer analisar.",
+            }
+
+        return self.review(code="", task=task, filename="sem_arquivo")
